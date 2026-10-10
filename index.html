@@ -99,6 +99,24 @@ select,input[type=number],input[type=text]{width:100%;padding:11px 14px;border:2
 .video{aspect-ratio:16/9;border:2px solid var(--line);border-radius:var(--r);overflow:hidden;background:#000;margin-top:28px}
 .video iframe{display:block;width:100%;height:100%;border:0}
 .vlink{display:inline-block;margin-top:16px;font-weight:700;font-size:.95rem}
+.tile[data-g]{cursor:zoom-in;transition:transform .2s}
+.tile[data-g]:hover{transform:translateY(-3px)}
+.tile[data-g]::before{content:"+";position:absolute;top:14px;right:14px;z-index:1;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:var(--ink);display:grid;place-items:center;font-size:1.3rem;font-weight:700;line-height:1}
+dialog#lb{border:0;padding:0;background:transparent;color:#fff;width:100vw;height:100vh;max-width:100vw;max-height:100vh}
+dialog#lb::backdrop{background:rgba(10,10,10,.97)}
+dialog#lb[open]{display:flex;align-items:center;justify-content:center}
+#lb figure{margin:0;max-width:min(92vw,1200px);text-align:center}
+#lb img{display:block;margin:0 auto;max-width:100%;max-height:80vh;border-radius:18px;border:2px solid #fff}
+#lb figcaption{margin-top:12px;font-weight:700}
+.lb-x,.lb-n{position:fixed;width:46px;height:46px;border:0;border-radius:50%;background:#fff;color:var(--ink);font-size:1.7rem;line-height:1;cursor:pointer}
+.lb-x:hover,.lb-n:hover{background:#FFD60A}
+.lb-x{top:18px;right:18px}
+.lb-n{top:50%;transform:translateY(-50%)}.lb-prev{left:16px}.lb-next{right:16px}
+#lb :focus-visible{outline-color:#fff}
+.peta{aspect-ratio:16/7;border:2px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--soft);margin:28px 0 20px}
+.peta iframe{display:block;width:100%;height:100%;border:0}
+@media(max-width:560px){.peta{aspect-ratio:4/3}.lb-n{width:40px;height:40px}}
+@media(prefers-reduced-motion:reduce){.tile[data-g]{transition:none}.tile[data-g]:hover{transform:none}}
 .sec{padding:0 0 96px}
 .logos,.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-top:28px}
 .logos div{border:2px solid var(--line);border-radius:20px;padding:22px;text-align:center;font-weight:700;background:#fff}
@@ -222,6 +240,12 @@ footer .wrap{border-top:1px solid #333;padding-top:18px}
   <p class="note">Harga per m² luas bangunan (lebar × panjang × jumlah lantai). Angka final ditentukan setelah konsultasi.</p>
 </section>
 
+<section class="wrap sec" id="lokasi">
+  <h2><b>Lokasi</b> kami<small>(Google Maps)</small></h2>
+  <div class="peta"><iframe id="petaFrame" title="Peta lokasi D Arsitek Studio" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+  <a class="btn" id="petaLink" href="#" target="_blank" rel="noopener">Buka di Google Maps ↗</a>
+</section>
+
 <section class="wrap sec" id="partner"><h2><b>Partner</b> kami</h2><div class="logos" id="partnerList"></div></section>
 <section class="wrap sec" id="team"><h2><b>Tim</b> D Arsitek Studio</h2><div class="team" id="teamList"></div></section>
 
@@ -233,6 +257,12 @@ footer .wrap{border-top:1px solid #333;padding-top:18px}
   </div>
 </section>
 </main>
+<dialog id="lb" aria-label="Pratinjau foto">
+  <button class="lb-x" id="lbX" type="button" aria-label="Tutup">&times;</button>
+  <button class="lb-n lb-prev" id="lbPrev" type="button" aria-label="Foto sebelumnya">&#8249;</button>
+  <figure><img id="lbImg" alt=""><figcaption id="lbCap"></figcaption></figure>
+  <button class="lb-n lb-next" id="lbNext" type="button" aria-label="Foto berikutnya">&#8250;</button>
+</dialog>
 <footer><div class="wrap">&copy; <span id="yr"></span> D Arsitek Studio. Jasa desain rumah dan bangunan usaha, Sidoarjo.</div></footer>
 
 <script>
@@ -249,6 +279,8 @@ const FOTO = {
 const WA = "6285385946503"; // format 62 tanpa 0 di depan
 const MIN_PROMO = 1500000; // estimasi di bawah angka ini tidak mendapat promo
 const LANTAI = [1, 1.5, 2, 2.5, 3]; // pilihan jumlah lantai (boleh ditambah, mis. 3.5, 4)
+const MAPS_LINK = "https://maps.app.goo.gl/FJH3c3YhBF7SdNZaA"; // link Google Maps untuk tombol
+const MAPS_LATLNG = "-7.4337501,112.7255745"; // titik lokasi untuk peta yang tertanam di halaman
 const PAKET = [
   // Harga per m². Tambahkan sembunyi:true untuk menyembunyikan paket sementara; hapus untuk menampilkannya lagi.
   { grup:"Best Deals", nama:"Paket Desain 3D Fasad & Interior, Free RAB dan DED", harga:50000 },
@@ -292,8 +324,16 @@ const $ = id => document.getElementById(id);
 const bg = (u, pos) => u ? `background-image:url('${u}');background-position:${pos || "center"}` : "";
 $("yr").textContent = new Date().getFullYear();
 $("waMain").href = `https://wa.me/${WA}?text=${encodeURIComponent("Halo D Arsitek Studio, saya ingin konsultasi desain.")}`;
+const GALERI = [];
+const tambah = (src, nama) => { if(!src) return -1; GALERI.push({ src, nama }); return GALERI.length - 1; };
+const gHero = tambah(HERO_IMG, "D Arsitek Studio");
 $("heroImg").setAttribute("style", bg(HERO_IMG, "45% 50%"));
-$("bento").insertAdjacentHTML("beforeend", PORTOFOLIO.map(p => `<div class="tile ${p.kelas}" role="img" aria-label="${p.nama}" style="${bg(p.img, p.pos)}"><span>${p.nama}</span></div>`).join(""));
+if(gHero >= 0){ const h = $("heroImg"); h.dataset.g = gHero; h.tabIndex = 0; h.setAttribute("role", "button"); h.setAttribute("aria-label", "Lihat foto D Arsitek Studio"); }
+$("bento").insertAdjacentHTML("beforeend", PORTOFOLIO.map(p => {
+  const g = tambah(p.img, p.nama);
+  const a = g >= 0 ? `data-g="${g}" tabindex="0" role="button" aria-label="Lihat foto ${p.nama}"` : `role="img" aria-label="${p.nama}"`;
+  return `<div class="tile ${p.kelas}" ${a} style="${bg(p.img, p.pos)}"><span>${p.nama}</span></div>`;
+}).join(""));
 
 if(PARTNER.length) $("partnerList").innerHTML = PARTNER.map(n => `<div>${n}</div>`).join("");
 else { $("partner").remove(); $("nPartner").remove(); }
@@ -360,6 +400,27 @@ function estimasi(){
 $("hitung").addEventListener("click", estimasi);
 document.querySelectorAll('input[name="lt"]').forEach(r => r.addEventListener("change", segarkan));
 ukuran();
+
+/* Pratinjau foto (klik foto untuk memperbesar) */
+const lb = $("lb"); let gi = 0;
+function lihat(i){
+  gi = (i + GALERI.length) % GALERI.length;
+  $("lbImg").src = GALERI[gi].src; $("lbImg").alt = GALERI[gi].nama; $("lbCap").textContent = GALERI[gi].nama;
+}
+function buka(i){ lihat(i); $("lbPrev").hidden = $("lbNext").hidden = GALERI.length < 2; lb.showModal(); }
+document.addEventListener("click", e => { const t = e.target.closest("[data-g]"); if(t) buka(+t.dataset.g); });
+document.addEventListener("keydown", e => {
+  if(lb.open){ if(e.key === "ArrowLeft") lihat(gi - 1); if(e.key === "ArrowRight") lihat(gi + 1); return; }
+  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-g]")){ e.preventDefault(); buka(+e.target.dataset.g); }
+});
+$("lbX").addEventListener("click", () => lb.close());
+$("lbPrev").addEventListener("click", () => lihat(gi - 1));
+$("lbNext").addEventListener("click", () => lihat(gi + 1));
+lb.addEventListener("click", e => { if(e.target === lb) lb.close(); });
+
+/* Peta Google Maps */
+$("petaFrame").src = `https://www.google.com/maps?q=${MAPS_LATLNG}&z=17&output=embed`;
+$("petaLink").href = MAPS_LINK;
 
 /* Countdown penawaran hari ini: menghitung mundur sampai pukul 24.00 WIB, lalu mulai lagi 24 jam berikutnya. */
 (function(){
